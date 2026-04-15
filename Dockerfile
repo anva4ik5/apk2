@@ -31,12 +31,13 @@ RUN mkdir -p build && cd build && \
 # ============================================================
 FROM ubuntu:22.04
 
-# Устанавливаем только необходимые runtime-библиотеки
+# Устанавливаем только необходимые runtime-библиотеки + psql для миграций
 RUN apt-get update && apt-get install -y \
     libsodium23 \
     libhiredis0.14 \
     libssl3 \
     libpq5 \
+    postgresql-client \
     ca-certificates \
     curl \
     && rm -rf /var/lib/apt/lists/*
@@ -44,8 +45,11 @@ RUN apt-get update && apt-get install -y \
 RUN useradd -m -u 1000 messenger && mkdir -p /app/data && chown messenger:messenger /app/data
 WORKDIR /app
 
-# Копируем скомпилированный бинарник из стадии builder
+# Копируем бинарник, миграцию и entrypoint
 COPY --from=builder --chown=messenger:messenger /build/build/bin/messenger_server /app/server
+COPY --chown=messenger:messenger database/migration_http_api.sql /app/migration.sql
+COPY --chown=messenger:messenger entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
 
 USER messenger
 
@@ -61,4 +65,4 @@ EXPOSE 8080 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
     CMD curl -sf http://localhost:${PORT}/health || exit 1
 
-CMD ["/app/server"]
+CMD ["/app/entrypoint.sh"]
