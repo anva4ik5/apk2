@@ -36,8 +36,7 @@ RUN mkdir -p build && cd build && \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_CXX_COMPILER=g++ \
     -DCMAKE_C_COMPILER=gcc \
-    &&  make -j$(nproc) && \
-    make install DESTDIR=/app
+    &&  make -j$(nproc)
 
 # ============================================================================
 # Stage 2: Runtime (minimal image)
@@ -65,7 +64,7 @@ RUN useradd -m -u 1000 messenger && \
 WORKDIR /app
 
 # Copy compiled binary from builder
-COPY --from=builder --chown=messenger:messenger /build/build/bin/messenger-server /app/messenger-server
+COPY --from=builder --chown=messenger:messenger /build/build/bin/messenger_server /app/messenger-server
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
