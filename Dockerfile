@@ -3,16 +3,26 @@
 # ============================================================
 FROM ubuntu:22.04 AS builder
 
+# Добавлены libasio-dev и python3 для корректной сборки
 RUN apt-get update && apt-get install -y \
-    build-essential cmake git pkg-config \
-    libsodium-dev libhiredis-dev libssl-dev libpq-dev \
+    build-essential \
+    cmake \
+    git \
+    pkg-config \
+    libsodium-dev \
+    libhiredis-dev \
+    libssl-dev \
+    libpq-dev \
+    libasio-dev \
+    python3 \
     nlohmann-json3-dev \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /build
 COPY . .
 
-RUN mkdir build && cd build && \
+# Собираем проект
+RUN mkdir -p build && cd build && \
     cmake .. -DCMAKE_BUILD_TYPE=Release && \
     make -j$(nproc)
 
@@ -21,13 +31,20 @@ RUN mkdir build && cd build && \
 # ============================================================
 FROM ubuntu:22.04
 
+# Устанавливаем только необходимые runtime-библиотеки
 RUN apt-get update && apt-get install -y \
-    libsodium23 libhiredis0.14 libssl3 libpq5 \
-    ca-certificates curl \
+    libsodium23 \
+    libhiredis0.14 \
+    libssl3 \
+    libpq5 \
+    ca-certificates \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
-RUN useradd -m -u 1000 messenger && mkdir -p /app
+RUN useradd -m -u 1000 messenger && mkdir -p /app/data && chown messenger:messenger /app/data
 WORKDIR /app
+
+# Копируем скомпилированный бинарник из стадии builder
 COPY --from=builder --chown=messenger:messenger /build/build/bin/messenger_server /app/server
 
 USER messenger
