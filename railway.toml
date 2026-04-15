@@ -5,8 +5,7 @@ buildContext = "."
 
 [deploy]
 startCommand = "/app/messenger-server"
-healthcheckPath = "/health"
-healthcheckTimeout = 10
+restartPolicyType = "on_failure"
 
 [env]
 HOST = "0.0.0.0"
