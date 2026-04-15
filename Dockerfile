@@ -67,8 +67,9 @@ WORKDIR /app
 COPY --from=builder --chown=messenger:messenger /build/build/bin/messenger_server /app/messenger-server
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD curl -f http://localhost:8080/health || exit 1
+# Health check disabled - no /health endpoint implemented
+# HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+#     CMD curl -f http://localhost:8080/health || exit 1
 
 # Switch to non-root user
 USER messenger
