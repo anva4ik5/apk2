@@ -1,55 +1,17 @@
-[tool.railway]
-name = "Premium Messenger"
-description = "Enterprise-grade Telegram-like messenger with C++ backend and Flutter frontend"
-version = "2.0.0"
-
 [build]
 builder = "dockerfile"
 dockerfilePath = "cpp-backend/Dockerfile"
-context = "."
+buildContext = "."
 
-[[services]]
-name = "messenger-server"
-buildCommand = "cd cpp-backend && mkdir -p build && cd build && cmake .. -DCMAKE_BUILD_TYPE=Release && make -j$(nproc)"
+[deploy]
 startCommand = "./cpp-backend/build/bin/messenger-server"
-port = 8080
+healthcheckPath = "/health"
+healthcheckTimeout = 10
 
-[services.env]
+[env]
 HOST = "0.0.0.0"
 PORT = "8080"
 WS_PORT = "8000"
 LOG_LEVEL = "info"
 WORKERS = "8"
 MAX_CONNECTIONS = "50000"
-
-[[services.environments]]
-name = "production"
-REDIS_HOST = "${{ services.redis.host }}"
-REDIS_PORT = "${{ services.redis.port }}"
-LOG_LEVEL = "warn"
-
-[[services.environments]]
-name = "staging"
-LOG_LEVEL = "info"
-
-[[services.healthcheck]]
-path = "/health"
-interval = 30000
-timeout = 10000
-retries = 3
-
-[[services.deployment]]
-strategy = "rolling"
-minInstances = 2
-maxInstances = 5
-
-# Add-ons
-[[addons]]
-type = "Redis"
-version = "7.0"
-plan = "redis-business"
-
-[[addons]]
-type = "PostgreSQL"  # Optional, if using relational database
-version = "15"
-plan = "postgres-business"
