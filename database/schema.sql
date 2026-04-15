@@ -51,9 +51,9 @@ CREATE TABLE IF NOT EXISTS users (
     CONSTRAINT email_format CHECK (email ~ '^[^@]+@[^@]+\.[^@]+$')
 );
 
-CREATE INDEX idx_users_username ON users(username);
-CREATE INDEX idx_users_email ON users(email);
-CREATE INDEX idx_users_status ON users(status);
+CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_users_status ON users(status);
 
 -- ============================================================================
 -- SESSIONS TABLE
@@ -82,9 +82,9 @@ CREATE TABLE IF NOT EXISTS sessions (
     CONSTRAINT token_not_empty CHECK (LENGTH(token) > 0)
 );
 
-CREATE INDEX idx_sessions_user_id ON sessions(user_id);
-CREATE INDEX idx_sessions_token ON sessions(token);
-CREATE INDEX idx_sessions_active ON sessions(is_active);
+CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(token);
+CREATE INDEX IF NOT EXISTS idx_sessions_active ON sessions(is_active);
 
 -- ============================================================================
 -- CHATS TABLE (1-to-1 & Groups)
@@ -113,8 +113,8 @@ CREATE TABLE IF NOT EXISTS chats (
     )
 );
 
-CREATE INDEX idx_chats_type ON chats(chat_type);
-CREATE INDEX idx_chats_created_by ON chats(created_by);
+CREATE INDEX IF NOT EXISTS idx_chats_type ON chats(chat_type);
+CREATE INDEX IF NOT EXISTS idx_chats_created_by ON chats(created_by);
 
 -- ============================================================================
 -- CHAT MEMBERS TABLE
@@ -144,8 +144,8 @@ CREATE TABLE IF NOT EXISTS chat_members (
     UNIQUE(chat_id, user_id)
 );
 
-CREATE INDEX idx_chat_members_chat_id ON chat_members(chat_id);
-CREATE INDEX idx_chat_members_user_id ON chat_members(user_id);
+CREATE INDEX IF NOT EXISTS idx_chat_members_chat_id ON chat_members(chat_id);
+CREATE INDEX IF NOT EXISTS idx_chat_members_user_id ON chat_members(user_id);
 
 -- ============================================================================
 -- MESSAGES TABLE
@@ -179,10 +179,10 @@ CREATE TABLE IF NOT EXISTS messages (
     CONSTRAINT content_not_empty CHECK (LENGTH(content) > 0 OR content_type != 'text')
 );
 
-CREATE INDEX idx_messages_chat_id ON messages(chat_id);
-CREATE INDEX idx_messages_sender_id ON messages(sender_id);
-CREATE INDEX idx_messages_created_at ON messages(created_at DESC);
-CREATE INDEX idx_messages_reply_to ON messages(reply_to_id);
+CREATE INDEX IF NOT EXISTS idx_messages_chat_id ON messages(chat_id);
+CREATE INDEX IF NOT EXISTS idx_messages_sender_id ON messages(sender_id);
+CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_messages_reply_to ON messages(reply_to_id);
 
 -- ============================================================================
 -- MESSAGE DELIVERY STATUS TABLE
@@ -204,9 +204,9 @@ CREATE TABLE IF NOT EXISTS message_delivery (
     UNIQUE(message_id, recipient_id)
 );
 
-CREATE INDEX idx_msg_delivery_message_id ON message_delivery(message_id);
-CREATE INDEX idx_msg_delivery_recipient_id ON message_delivery(recipient_id);
-CREATE INDEX idx_msg_delivery_status ON message_delivery(status);
+CREATE INDEX IF NOT EXISTS idx_msg_delivery_message_id ON message_delivery(message_id);
+CREATE INDEX IF NOT EXISTS idx_msg_delivery_recipient_id ON message_delivery(recipient_id);
+CREATE INDEX IF NOT EXISTS idx_msg_delivery_status ON message_delivery(status);
 
 -- ============================================================================
 -- REACTIONS TABLE
@@ -227,8 +227,8 @@ CREATE TABLE IF NOT EXISTS reactions (
     UNIQUE(message_id, user_id, emoji)
 );
 
-CREATE INDEX idx_reactions_message_id ON reactions(message_id);
-CREATE INDEX idx_reactions_user_id ON reactions(user_id);
+CREATE INDEX IF NOT EXISTS idx_reactions_message_id ON reactions(message_id);
+CREATE INDEX IF NOT EXISTS idx_reactions_user_id ON reactions(user_id);
 
 -- ============================================================================
 -- CONTACTS TABLE
@@ -252,8 +252,8 @@ CREATE TABLE IF NOT EXISTS contacts (
     CONSTRAINT cant_add_self CHECK (user_id != contact_id)
 );
 
-CREATE INDEX idx_contacts_user_id ON contacts(user_id);
-CREATE INDEX idx_contacts_contact_id ON contacts(contact_id);
+CREATE INDEX IF NOT EXISTS idx_contacts_user_id ON contacts(user_id);
+CREATE INDEX IF NOT EXISTS idx_contacts_contact_id ON contacts(contact_id);
 
 -- ============================================================================
 -- CALLS TABLE (for history)
@@ -280,9 +280,9 @@ CREATE TABLE IF NOT EXISTS calls (
     CONSTRAINT duration_positive CHECK (duration_seconds IS NULL OR duration_seconds >= 0)
 );
 
-CREATE INDEX idx_calls_chat_id ON calls(chat_id);
-CREATE INDEX idx_calls_initiator_id ON calls(initiator_id);
-CREATE INDEX idx_calls_state ON calls(call_state);
+CREATE INDEX IF NOT EXISTS idx_calls_chat_id ON calls(chat_id);
+CREATE INDEX IF NOT EXISTS idx_calls_initiator_id ON calls(initiator_id);
+CREATE INDEX IF NOT EXISTS idx_calls_state ON calls(call_state);
 
 -- ============================================================================
 -- ENCRYPTION KEYS TABLE
@@ -307,8 +307,8 @@ CREATE TABLE IF NOT EXISTS encryption_keys (
     expires_at TIMESTAMP WITH TIME ZONE
 );
 
-CREATE INDEX idx_encryption_keys_user_id ON encryption_keys(user_id);
-CREATE INDEX idx_encryption_keys_active ON encryption_keys(is_active);
+CREATE INDEX IF NOT EXISTS idx_encryption_keys_user_id ON encryption_keys(user_id);
+CREATE INDEX IF NOT EXISTS idx_encryption_keys_active ON encryption_keys(is_active);
 
 -- ============================================================================
 -- FILE UPLOADS TABLE
@@ -341,8 +341,8 @@ CREATE TABLE IF NOT EXISTS file_uploads (
     CONSTRAINT file_size_positive CHECK (file_size > 0)
 );
 
-CREATE INDEX idx_file_uploads_message_id ON file_uploads(message_id);
-CREATE INDEX idx_file_uploads_uploader_id ON file_uploads(uploader_id);
+CREATE INDEX IF NOT EXISTS idx_file_uploads_message_id ON file_uploads(message_id);
+CREATE INDEX IF NOT EXISTS idx_file_uploads_uploader_id ON file_uploads(uploader_id);
 
 -- ============================================================================
 -- AUDIT LOG TABLE
@@ -362,9 +362,9 @@ CREATE TABLE IF NOT EXISTS audit_log (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_audit_log_user_id ON audit_log(user_id);
-CREATE INDEX idx_audit_log_event_type ON audit_log(event_type);
-CREATE INDEX idx_audit_log_created_at ON audit_log(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_log_user_id ON audit_log(user_id);
+CREATE INDEX IF NOT EXISTS idx_audit_log_event_type ON audit_log(event_type);
+CREATE INDEX IF NOT EXISTS idx_audit_log_created_at ON audit_log(created_at DESC);
 
 -- ============================================================================
 -- TRIGGERS FOR UPDATED_AT COLUMNS
@@ -378,12 +378,15 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS users_updated_at ON users;
 CREATE TRIGGER users_updated_at BEFORE UPDATE ON users
     FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
+DROP TRIGGER IF EXISTS chats_updated_at ON chats;
 CREATE TRIGGER chats_updated_at BEFORE UPDATE ON chats
     FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
+DROP TRIGGER IF EXISTS contacts_updated_at ON contacts;
 CREATE TRIGGER contacts_updated_at BEFORE UPDATE ON contacts
     FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
