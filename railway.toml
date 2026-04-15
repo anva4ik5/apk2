@@ -4,7 +4,7 @@ dockerfilePath = "Dockerfile"
 buildContext = "."
 
 [deploy]
-startCommand = "/app/messenger-server"
+startCommand = "/app/server"
 restartPolicyType = "on_failure"
 
 [env]
