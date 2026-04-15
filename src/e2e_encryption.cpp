@@ -60,7 +60,7 @@ bool E2EEncryption::verify_signature(
     
     if (!sodium_initialized_) initialize();
     
-    return crypto_sign_open_detached(
+    return crypto_sign_verify_detached(
         signature.data(),
         message.data(),
         message.size(),
@@ -76,9 +76,12 @@ std::array<uint8_t, E2EEncryption::SHARED_SECRET_SIZE> E2EEncryption::compute_sh
     
     std::array<uint8_t, SHARED_SECRET_SIZE> shared_secret;
     unsigned char rx[32], tx[32];
+    unsigned char own_pk[32];
+    crypto_scalarmult_base(own_pk, private_key.data());
     
     crypto_kx_client_session_keys(
         rx, tx,
+        own_pk,
         private_key.data(),
         peer_public_key.data()
     );
