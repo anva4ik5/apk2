@@ -1,0 +1,156 @@
+version: '3.9'
+
+services:
+  # PostgreSQL Database (for user data, sessions, metadata)
+  postgres:
+    image: postgres:15-alpine
+    container_name: messenger-postgres
+    environment:
+      POSTGRES_USER: messenger
+      POSTGRES_PASSWORD: secure_password_change_me
+      POSTGRES_DB: messenger_db
+      POSTGRES_INITDB_ARGS: "-c max_connections=200"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./migrations:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U messenger"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - messenger-net
+    restart: unless-stopped
+
+  # Redis (for Pub/Sub, caching, session store)
+  redis:
+    image: redis:7-alpine
+    container_name: messenger-redis
+    command: redis-server 
+      --maxmemory 512mb 
+      --maxmemory-policy allkeys-lru
+      --save 60 1000
+      --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - messenger-net
+    restart: unless-stopped
+
+  # Redis Sentinel (for failover - optional, comment out for dev)
+  # redis-sentinel:
+  #   image: redis:7-alpine
+  #   container_name: messenger-redis-sentinel
+  #   command: redis-sentinel /etc/redis/sentinel.conf
+  #   ports:
+  #     - "26379:26379"
+  #   networks:
+  #     - messenger-net
+  #   depends_on:
+  #     - redis
+
+  # C++ Messenger Server
+  messenger-server:
+    build:
+      context: .
+      dockerfile: ./cpp-backend/Dockerfile
+    container_name: messenger-server
+    environment:
+      HOST: 0.0.0.0
+      PORT: 8080
+      WS_PORT: 8000
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      LOG_LEVEL: info
+      WORKERS: 4
+      MAX_CONNECTIONS: 10000
+    ports:
+      - "8080:8080"  # HTTP API
+      - "8000:8000"  # WebSocket
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - messenger-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # pgAdmin (PostgreSQL GUI - optional, only for development)
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: messenger-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@example.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres
+    networks:
+      - messenger-net
+    restart: unless-stopped
+
+  # Redis Commander (Redis GUI - optional, only for development)
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: messenger-redis-commander
+    environment:
+      REDIS_HOSTS: local:redis:6379
+    ports:
+      - "8081:8081"
+    depends_on:
+      - redis
+    networks:
+      - messenger-net
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  messenger-net:
+    driver: bridge
+
+# ============================================================================
+# How to use:
+#
+# Start all services:
+#   docker-compose up -d
+#
+# View logs:
+#   docker-compose logs -f messenger-server
+#
+# Stop services:
+#   docker-compose down
+#
+# Remove volumes (careful!):
+#   docker-compose down -v
+#
+# Access services:
+#   - Messenger Server: http://localhost:8080
+#   - WebSocket: ws://localhost:8000
+#   - PostgreSQL: localhost:5432
+#   - Redis: localhost:6379
+#   - pgAdmin: http://localhost:5050
+#   - Redis Commander: http://localhost:8081
+#
+# ============================================================================

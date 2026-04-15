@@ -1,0 +1,40 @@
+# CMake build artifacts
+cmake_install.cmake
+CMakeCache.txt
+CMakeFiles/
+*.cmake
+Makefile
+build/
+bin/
+lib/
+*.a
+*.o
+*.so
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+
+# Dependencies
+third_party/
+external/
+
+# Test results
+test_output/
+*.log
+
+# Binary artifacts
+messenger_server
+
+# PostgreSQL
+*.sql~
