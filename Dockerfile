@@ -45,8 +45,9 @@ RUN apt-get update && apt-get install -y \
 RUN useradd -m -u 1000 messenger && mkdir -p /app/data && chown messenger:messenger /app/data
 WORKDIR /app
 
-# Копируем бинарник, миграцию и entrypoint
+# Копируем бинарник, схему, миграцию и entrypoint
 COPY --from=builder --chown=messenger:messenger /build/build/bin/messenger_server /app/server
+COPY --chown=messenger:messenger database/schema.sql /app/schema.sql
 COPY --chown=messenger:messenger database/migration_http_api.sql /app/migration.sql
 COPY --chown=messenger:messenger entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
