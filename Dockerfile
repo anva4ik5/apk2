@@ -49,7 +49,7 @@ LABEL version="2.0.0"
 # Install  runtime dependencies only
 RUN apt-get update && apt-get install -y \
     libsodium23 \
-    libhiredis0 \
+    libhiredis0.14 \
     libssl3 \
     ca-certificates \
     curl \
