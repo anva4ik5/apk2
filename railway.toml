@@ -1,6 +1,6 @@
 [build]
 builder = "dockerfile"
-dockerfilePath = "cpp-backend/Dockerfile"
+dockerfilePath = "Dockerfile"
 buildContext = "."
 
 [deploy]
