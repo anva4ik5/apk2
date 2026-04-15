@@ -30,6 +30,9 @@ public:
         std::string redis_host = "localhost";
         int redis_port = 6379;
         
+        // PostgreSQL Configuration (Railway)
+        std::string db_connection = "postgresql://postgres:OPNuOrYZJidOPlGCcCwpDMYOROWtsWZq@postgres.railway.internal:5432/railway";
+        
         std::string log_level = "info";  // debug, info, warn, error
         int worker_threads = 4;
         int max_connections = 100000;
