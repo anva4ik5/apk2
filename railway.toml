@@ -4,7 +4,7 @@ dockerfilePath = "Dockerfile"
 buildContext = "."
 
 [deploy]
-startCommand = "./cpp-backend/build/bin/messenger-server"
+startCommand = "/app/messenger-server"
 healthcheckPath = "/health"
 healthcheckTimeout = 10
 
