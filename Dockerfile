@@ -65,7 +65,7 @@ RUN useradd -m -u 1000 messenger && \
 WORKDIR /app
 
 # Copy compiled binary from builder
-COPY --from=builder --chown=messenger:messenger /app/usr/local/bin/messenger-server /app/messenger-server
+COPY --from=builder --chown=messenger:messenger /build/build/bin/messenger-server /app/messenger-server
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
