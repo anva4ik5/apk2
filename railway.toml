@@ -3,7 +3,7 @@ name = "Premium Messenger"
 description = "Enterprise-grade Telegram-like messenger with C++ backend and Flutter frontend"
 version = "2.0.0"
 
-[[build]]
+[build]
 builder = "dockerfile"
 dockerfilePath = "cpp-backend/Dockerfile"
 context = "."
