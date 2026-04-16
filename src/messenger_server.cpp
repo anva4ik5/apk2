@@ -41,12 +41,29 @@ bool MessengerServer::start() {
         on_redis_disconnected();
     });
 
-    while (!redis_->connect()) {
-        log("error", "Failed to connect to Redis, retrying in 5 seconds...");
-        std::this_thread::sleep_for(std::chrono::seconds(5));
+    int redis_attempts = 0;
+    const int redis_max_attempts = 10;
+    bool redis_connected = false;
+    
+    while (redis_attempts < redis_max_attempts && !redis_connected) {
+        if (redis_->connect()) {
+            redis_connected = true;
+            on_redis_connected();
+            log("info", "Redis connected successfully");
+            break;
+        }
+        ++redis_attempts;
+        if (redis_attempts < redis_max_attempts) {
+            log("warn", "Redis connection failed (attempt " + std::to_string(redis_attempts) + "/" 
+                + std::to_string(redis_max_attempts) + "), retrying in 3 seconds...");
+            std::this_thread::sleep_for(std::chrono::seconds(3));
+        }
     }
-
-    on_redis_connected();
+    
+    if (!redis_connected) {
+        log("error", "WARNING: Failed to connect to Redis after " + std::to_string(redis_max_attempts) 
+            + " attempts. Server continuing in degraded mode.");
+    }
     
     running_ = true;
     

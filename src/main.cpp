@@ -27,14 +27,28 @@ int main(int argc, char* argv[]) {
     std::string db_url     = env("DATABASE_URL",
         "postgresql://postgres:OPNuOrYZJidOPlGCcCwpDMYOROWtsWZq"
         "@postgres.railway.internal:5432/railway");
-    std::string redis_url  = env("REDIS_URL", "");
-    if (redis_url.empty()) {
-        redis_url = "redis://redis:6379";
-    }
-
+    
     std::string redis_host;
     int         redis_port = 6379;
-    {
+    
+    std::string redishost_env = env("REDISHOST", "");
+    std::string redisport_env = env("REDISPORT", "");
+    
+    if (!redishost_env.empty()) {
+        redis_host = redishost_env;
+        if (!redisport_env.empty()) {
+            try {
+                redis_port = std::stoi(redisport_env);
+            } catch (...) {
+                redis_port = 6379;
+            }
+        }
+    } else {
+        std::string redis_url = env("REDIS_URL", "");
+        if (redis_url.empty()) {
+            redis_url = "redis://redis:6379";
+        }
+
         std::string url = redis_url;
         auto scheme_pos = url.find("://");
         if (scheme_pos != std::string::npos) {
@@ -58,8 +72,18 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    uint16_t    http_port  = (uint16_t)std::stoi(env("PORT",    "8080"));
-    uint16_t    ws_port    = (uint16_t)std::stoi(env("WS_PORT", "8000"));
+    uint16_t    http_port  = 8080;
+    try {
+        http_port = (uint16_t)std::stoi(env("PORT", "8080"));
+    } catch (...) {
+        http_port = 8080;
+    }
+    uint16_t    ws_port    = 8000;
+    try {
+        ws_port = (uint16_t)std::stoi(env("WS_PORT", "8000"));
+    } catch (...) {
+        ws_port = 8000;
+    }
     std::string jwt_secret = env("JWT_SECRET", "change_me_in_production_please");
     std::string log_level  = env("LOG_LEVEL",  "info");
 
@@ -109,12 +133,20 @@ int main(int argc, char* argv[]) {
     MessengerServer ws_server(ws_cfg);
     g_ws_server = &ws_server;
 
-    while (!ws_server.start()) {
-        std::cerr << "[WS] Failed to start, retrying in 5 seconds..." << std::endl;
+    int startup_attempts = 0;
+    while (!ws_server.start() && startup_attempts < 10) {
+        std::cerr << "[WS] Failed to start, retrying in 5 seconds... (attempt " 
+                  << ++startup_attempts << "/10)" << std::endl;
         std::this_thread::sleep_for(std::chrono::seconds(5));
     }
 
-    std::cout << "[ok] Both servers running. Ctrl+C to stop." << std::endl;
+    if (!ws_server.is_running()) {
+        std::cerr << "[WS] Failed to start after retries, continuing with HTTP server only" << std::endl;
+    }
+
+    std::cout << "[ok] HTTP server running on port " << http_port 
+              << ". WS server status: " << (ws_server.is_running() ? "running" : "degraded") 
+              << ". Ctrl+C to stop." << std::endl;
 
     int tick = 0;
     while (ws_server.is_running()) {
