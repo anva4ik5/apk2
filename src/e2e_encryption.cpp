@@ -79,12 +79,14 @@ std::array<uint8_t, E2EEncryption::SHARED_SECRET_SIZE> E2EEncryption::compute_sh
     unsigned char own_pk[32];
     crypto_scalarmult_base(own_pk, private_key.data());
     
-    crypto_kx_client_session_keys(
+    if (crypto_kx_client_session_keys(
         rx, tx,
         own_pk,
         private_key.data(),
         peer_public_key.data()
-    );
+    ) != 0) {
+        throw std::runtime_error("Shared secret computation failed");
+    }
     
     std::memcpy(shared_secret.data(), rx, SHARED_SECRET_SIZE);
     return shared_secret;
@@ -99,7 +101,6 @@ E2EEncryption::SessionKeys E2EEncryption::derive_session_keys(
     SessionKeys keys{};
     
     // Use HKDF-SHA256 for key derivation
-    unsigned char info[] = "messenger-session-keys";
     unsigned char salt_bytes[16] = {0};
     
     if (!salt.empty()) {
@@ -108,28 +109,32 @@ E2EEncryption::SessionKeys E2EEncryption::derive_session_keys(
     }
     
     // Derive send_key
-    crypto_pwhash(
+    if (crypto_pwhash(
         keys.send_key.data(), CIPHER_KEY_SIZE,
         (const char*)shared_secret.data(), SHARED_SECRET_SIZE,
         salt_bytes,
         crypto_pwhash_OPSLIMIT_SENSITIVE,
         crypto_pwhash_MEMLIMIT_SENSITIVE,
         crypto_pwhash_ALG_DEFAULT
-    );
+    ) != 0) {
+        throw std::runtime_error("Key derivation failed");
+    }
     
     // Derive recv_key (different salt component)
     unsigned char modified_salt[16];
     std::memcpy(modified_salt, salt_bytes, 16);
     modified_salt[0] ^= 0xFF;  // Flip one byte to make it different
     
-    crypto_pwhash(
+    if (crypto_pwhash(
         keys.recv_key.data(), CIPHER_KEY_SIZE,
         (const char*)shared_secret.data(), SHARED_SECRET_SIZE,
         modified_salt,
         crypto_pwhash_OPSLIMIT_SENSITIVE,
         crypto_pwhash_MEMLIMIT_SENSITIVE,
         crypto_pwhash_ALG_DEFAULT
-    );
+    ) != 0) {
+        throw std::runtime_error("Key derivation failed");
+    }
     
     return keys;
 }
@@ -183,7 +188,7 @@ E2EEncryption::EncryptedMessage E2EEncryption::encrypt(
 std::vector<uint8_t> E2EEncryption::decrypt(
     const EncryptedMessage& encrypted,
     const std::array<uint8_t, CIPHER_KEY_SIZE>& key,
-    uint64_t expected_counter) {
+    uint64_t /*expected_counter*/) {
     
     if (!sodium_initialized_) initialize();
     
@@ -246,7 +251,7 @@ std::vector<uint8_t> E2EEncryption::derive_key(
     unsigned char salt_bytes[16];
     std::memcpy(salt_bytes, salt.data(), std::min(salt.size(), size_t(16)));
     
-    crypto_pwhash(
+    if (crypto_pwhash(
         derived_key.data(),
         key_length,
         password.c_str(),
@@ -255,7 +260,9 @@ std::vector<uint8_t> E2EEncryption::derive_key(
         crypto_pwhash_OPSLIMIT_INTERACTIVE,
         crypto_pwhash_MEMLIMIT_INTERACTIVE,
         crypto_pwhash_ALG_DEFAULT
-    );
+    ) != 0) {
+        throw std::runtime_error("Key derivation failed");
+    }
     
     return derived_key;
 }

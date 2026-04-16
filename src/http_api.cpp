@@ -199,7 +199,8 @@ static std::string base64url_decode_str(const std::string& in) {
             if (c>='A'&&c<='Z') return c-'A';
             if (c>='a'&&c<='z') return c-'a'+26;
             if (c>='0'&&c<='9') return c-'0'+52;
-            if (c=='+') return 62; if (c=='/') return 63;
+            if (c=='+') return 62;
+            if (c=='/') return 63;
             return -1;
         };
         int v0=val(s[i]), v1=val(s[i+1]);

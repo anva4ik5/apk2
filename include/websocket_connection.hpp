@@ -100,6 +100,6 @@ public:
 
 private:
     std::map<int, std::shared_ptr<WebSocketConnection>> connections_;
-    std::map<std::string, int> user_to_connection_;  // user_id -> connection_id
+    std::map<std::string, int> user_to_connection_;
     mutable std::mutex mutex_;
 };

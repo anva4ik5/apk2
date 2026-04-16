@@ -9,6 +9,7 @@
 #include <mutex>
 #include <condition_variable>
 #include <map>
+#include <hiredis/hiredis.h>
 
 /**
  * @class RedisClient
@@ -94,7 +95,7 @@ public:
 
 private:
     struct Connection {
-        int socket_fd = -1;
+        redisContext* context = nullptr;
         std::mutex mutex;
         bool in_use = false;
         std::chrono::system_clock::time_point created_at;
@@ -114,8 +115,7 @@ private:
     std::string last_error_;
 
     // Helper methods
-    std::unique_ptr<Connection> acquire_connection();
-    void release_connection(std::unique_ptr<Connection> conn);
+    std::shared_ptr<Connection> acquire_connection();
     std::string send_command(Connection& conn, const std::string& cmd);
     void subscriber_loop();
     void handle_reconnect();

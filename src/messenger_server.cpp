@@ -347,7 +347,7 @@ void MessengerServer::redis_message_handler(const std::string& channel, const st
         send_to_user(user_id, WebSocketConnection::Message{
             .type = msg_json.value("type", "message"),
             .payload = msg_json,
-            .timestamp = std::time(nullptr),
+            .timestamp = static_cast<uint64_t>(std::time(nullptr)),
             .requires_ack = true
         });
     } catch (const json::parse_error& e) {
@@ -361,12 +361,12 @@ bool MessengerServer::process_encrypted_message(const json& message, std::string
     return true;
 }
 
-std::string MessengerServer::encrypt_for_delivery(const std::string& content, const std::string& recipient_id) {
+std::string MessengerServer::encrypt_for_delivery(const std::string& content, const std::string& /*recipient_id*/) {
     // Placeholder: Would encrypt using recipient's session key
     return content;
 }
 
-bool MessengerServer::authenticate_user(const std::string& username, const std::string& password, 
+bool MessengerServer::authenticate_user(const std::string& username, const std::string& /*password*/, 
                                        std::string& user_id, std::string& session_token) {
     // TODO: Implement proper authentication with database
     // This is a placeholder that accepts any user for demo
@@ -377,7 +377,7 @@ bool MessengerServer::authenticate_user(const std::string& username, const std::
     return true;
 }
 
-bool MessengerServer::validate_session(const std::string& session_token, std::string& user_id) {
+bool MessengerServer::validate_session(const std::string& /*session_token*/, std::string& /*user_id*/) {
     // TODO: Implement session validation
     return false;
 }
