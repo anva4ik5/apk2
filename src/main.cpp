@@ -27,8 +27,37 @@ int main(int argc, char* argv[]) {
     std::string db_url     = env("DATABASE_URL",
         "postgresql://postgres:OPNuOrYZJidOPlGCcCwpDMYOROWtsWZq"
         "@postgres.railway.internal:5432/railway");
-    std::string redis_host = env("REDIS_HOST", "localhost");
-    int         redis_port = std::stoi(env("REDIS_PORT", "6379"));
+    std::string redis_url  = env("REDIS_URL", "");
+    if (redis_url.empty()) {
+        redis_url = "redis://redis:6379";
+    }
+
+    std::string redis_host;
+    int         redis_port = 6379;
+    {
+        std::string url = redis_url;
+        auto scheme_pos = url.find("://");
+        if (scheme_pos != std::string::npos) {
+            url = url.substr(scheme_pos + 3);
+        }
+        auto slash_pos = url.find('/');
+        if (slash_pos != std::string::npos) {
+            url = url.substr(0, slash_pos);
+        }
+        auto colon_pos = url.rfind(':');
+        if (colon_pos != std::string::npos && colon_pos + 1 < url.size()) {
+            redis_host = url.substr(0, colon_pos);
+            try {
+                redis_port = std::stoi(url.substr(colon_pos + 1));
+            } catch (...) {
+                redis_port = 6379;
+            }
+        } else {
+            redis_host = url.empty() ? "redis" : url;
+            redis_port = 6379;
+        }
+    }
+
     uint16_t    http_port  = (uint16_t)std::stoi(env("PORT",    "8080"));
     uint16_t    ws_port    = (uint16_t)std::stoi(env("WS_PORT", "8000"));
     std::string jwt_secret = env("JWT_SECRET", "change_me_in_production_please");

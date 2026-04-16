@@ -78,6 +78,8 @@ public:
     void run();
     void stop();
 
+    std::string authenticate_request(const std::string& auth_header, int& status_code) const;
+
 private:
     Config cfg_;
     std::unique_ptr<PgDb> db_;

@@ -15,17 +15,16 @@ services:
       - messenger-net
     restart: unless-stopped
 
-  messenger-server:
+  app:
     build:
       context: .
       dockerfile: ./Dockerfile
-    container_name: messenger-server
+    container_name: messenger-app
     environment:
       HOST: 0.0.0.0
       PORT: 8080
       WS_PORT: 8000
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
+      REDIS_URL: redis://redis:6379
       JWT_SECRET: change_me_in_production_please
       LOG_LEVEL: info
     ports:

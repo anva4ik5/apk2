@@ -456,26 +456,40 @@ std::string HttpApi::extract_token(const std::string& auth_header) const {
 }
 
 std::string HttpApi::authenticate_request(const std::string& auth_header) const {
+    int status_code = 401;
+    return authenticate_request(auth_header, status_code);
+}
+
+std::string HttpApi::authenticate_request(const std::string& auth_header, int& status_code) const {
     auto token = extract_token(auth_header);
-    if (token.empty()) return "";
+    if (token.empty()) {
+        status_code = 401;
+        return "";
+    }
 
     if (!redis_ || !redis_->is_connected()) {
-        if (redis_ && !redis_->connect()) {
+        if (!redis_ || !redis_->connect()) {
             std::cerr << "[HTTP] Redis unavailable for auth validation" << std::endl;
+            status_code = 503;
             return "";
         }
     }
 
     auto user_id = JwtHelper::verify(token, cfg_.jwt_secret);
-    if (user_id.empty()) return "";
+    if (user_id.empty()) {
+        status_code = 401;
+        return "";
+    }
 
     if (redis_available()) {
         auto stored_user = redis_->get("session:" + token);
         if (stored_user.empty() || stored_user != user_id) {
+            status_code = 401;
             return "";
         }
     }
 
+    status_code = 200;
     return user_id;
 }
 
@@ -798,8 +812,9 @@ void HttpApi::route_register() {
 void HttpApi::route_get_me() {
     CROW_ROUTE((*app_), "/api/auth/me")
     ([this](const crow::request& req) {
-        std::string uid = authenticate_request(req.get_header_value("Authorization"));
-        if (uid.empty()) return JSON_ERR(401, "Unauthorized");
+        int auth_status = 401;
+        std::string uid = authenticate_request(req.get_header_value("Authorization"), auth_status);
+        if (uid.empty()) return JSON_ERR(auth_status, auth_status == 503 ? "Service unavailable" : "Unauthorized");
 
         try {
             auto rows = db_->query(R"(
@@ -835,8 +850,9 @@ void HttpApi::route_get_me() {
 void HttpApi::route_update_me() {
     CROW_ROUTE((*app_), "/api/auth/me").methods("PATCH"_method)
     ([this](const crow::request& req) {
-        std::string uid = authenticate_request(req.get_header_value("Authorization"));
-        if (uid.empty()) return JSON_ERR(401, "Unauthorized");
+        int auth_status = 401;
+        std::string uid = authenticate_request(req.get_header_value("Authorization"), auth_status);
+        if (uid.empty()) return JSON_ERR(auth_status, auth_status == 503 ? "Service unavailable" : "Unauthorized");
 
         json body;
         try { body = json::parse(req.body); }
@@ -883,8 +899,9 @@ void HttpApi::route_update_me() {
 void HttpApi::route_search_users() {
     CROW_ROUTE((*app_), "/api/auth/users/search")
     ([this](const crow::request& req) {
-        std::string uid = authenticate_request(req.get_header_value("Authorization"));
-        if (uid.empty()) return JSON_ERR(401, "Unauthorized");
+        int auth_status = 401;
+        std::string uid = authenticate_request(req.get_header_value("Authorization"), auth_status);
+        if (uid.empty()) return JSON_ERR(auth_status, auth_status == 503 ? "Service unavailable" : "Unauthorized");
 
         std::string q = req.url_params.get("q") ? req.url_params.get("q") : "";
         if (q.empty()) return json_resp(200, json::array());
@@ -923,8 +940,9 @@ void HttpApi::route_search_users() {
 void HttpApi::route_get_user() {
     CROW_ROUTE((*app_), "/api/auth/users/<string>")
     ([this](const crow::request& req, const std::string& user_id) {
-        std::string uid = authenticate_request(req.get_header_value("Authorization"));
-        if (uid.empty()) return JSON_ERR(401, "Unauthorized");
+        int auth_status = 401;
+        std::string uid = authenticate_request(req.get_header_value("Authorization"), auth_status);
+        if (uid.empty()) return JSON_ERR(auth_status, auth_status == 503 ? "Service unavailable" : "Unauthorized");
 
         try {
             auto rows = db_->query(R"(
@@ -954,8 +972,9 @@ void HttpApi::route_get_user() {
 void HttpApi::route_get_chats() {
     CROW_ROUTE((*app_), "/api/chats")
     ([this](const crow::request& req) {
-        std::string uid = authenticate_request(req.get_header_value("Authorization"));
-        if (uid.empty()) return JSON_ERR(401, "Unauthorized");
+        int auth_status = 401;
+        std::string uid = authenticate_request(req.get_header_value("Authorization"), auth_status);
+        if (uid.empty()) return JSON_ERR(auth_status, auth_status == 503 ? "Service unavailable" : "Unauthorized");
 
         try {
             auto rows = db_->query(R"(
@@ -1002,8 +1021,9 @@ void HttpApi::route_get_chats() {
 void HttpApi::route_open_direct() {
     CROW_ROUTE((*app_), "/api/chats/direct").methods("POST"_method)
     ([this](const crow::request& req) {
-        std::string uid = authenticate_request(req.get_header_value("Authorization"));
-        if (uid.empty()) return JSON_ERR(401, "Unauthorized");
+        int auth_status = 401;
+        std::string uid = authenticate_request(req.get_header_value("Authorization"), auth_status);
+        if (uid.empty()) return JSON_ERR(auth_status, auth_status == 503 ? "Service unavailable" : "Unauthorized");
 
         json body;
         try { body = json::parse(req.body); }
@@ -1052,8 +1072,9 @@ void HttpApi::route_open_direct() {
 void HttpApi::route_create_group() {
     CROW_ROUTE((*app_), "/api/chats/group").methods("POST"_method)
     ([this](const crow::request& req) {
-        std::string uid = authenticate_request(req.get_header_value("Authorization"));
-        if (uid.empty()) return JSON_ERR(401, "Unauthorized");
+        int auth_status = 401;
+        std::string uid = authenticate_request(req.get_header_value("Authorization"), auth_status);
+        if (uid.empty()) return JSON_ERR(auth_status, auth_status == 503 ? "Service unavailable" : "Unauthorized");
 
         json body;
         try { body = json::parse(req.body); }
@@ -1105,8 +1126,9 @@ void HttpApi::route_create_group() {
 void HttpApi::route_get_chat_info() {
     CROW_ROUTE((*app_), "/api/chats/<string>")
     ([this](const crow::request& req, const std::string& chat_id) {
-        std::string uid = authenticate_request(req.get_header_value("Authorization"));
-        if (uid.empty()) return JSON_ERR(401, "Unauthorized");
+        int auth_status = 401;
+        std::string uid = authenticate_request(req.get_header_value("Authorization"), auth_status);
+        if (uid.empty()) return JSON_ERR(auth_status, auth_status == 503 ? "Service unavailable" : "Unauthorized");
 
         try {
             // Verify membership
@@ -1142,8 +1164,9 @@ void HttpApi::route_get_chat_info() {
 void HttpApi::route_get_messages() {
     CROW_ROUTE((*app_), "/api/chats/<string>/messages")
     ([this](const crow::request& req, const std::string& chat_id) {
-        std::string uid = authenticate_request(req.get_header_value("Authorization"));
-        if (uid.empty()) return JSON_ERR(401, "Unauthorized");
+        int auth_status = 401;
+        std::string uid = authenticate_request(req.get_header_value("Authorization"), auth_status);
+        if (uid.empty()) return JSON_ERR(auth_status, auth_status == 503 ? "Service unavailable" : "Unauthorized");
 
         std::string before = req.url_params.get("before")
                              ? req.url_params.get("before") : "";
@@ -1209,8 +1232,9 @@ void HttpApi::route_get_messages() {
 void HttpApi::route_get_members() {
     CROW_ROUTE((*app_), "/api/chats/<string>/members")
     ([this](const crow::request& req, const std::string& chat_id) {
-        std::string uid = authenticate_request(req.get_header_value("Authorization"));
-        if (uid.empty()) return JSON_ERR(401, "Unauthorized");
+        int auth_status = 401;
+        std::string uid = authenticate_request(req.get_header_value("Authorization"), auth_status);
+        if (uid.empty()) return JSON_ERR(auth_status, auth_status == 503 ? "Service unavailable" : "Unauthorized");
 
         try {
             auto rows = db_->query(R"(
@@ -1249,8 +1273,9 @@ void HttpApi::route_get_members() {
 void HttpApi::route_add_member() {
     CROW_ROUTE((*app_), "/api/chats/<string>/members").methods("POST"_method)
     ([this](const crow::request& req, const std::string& chat_id) {
-        std::string uid = authenticate_request(req.get_header_value("Authorization"));
-        if (uid.empty()) return JSON_ERR(401, "Unauthorized");
+        int auth_status = 401;
+        std::string uid = authenticate_request(req.get_header_value("Authorization"), auth_status);
+        if (uid.empty()) return JSON_ERR(auth_status, auth_status == 503 ? "Service unavailable" : "Unauthorized");
 
         json body;
         try { body = json::parse(req.body); }
@@ -1281,8 +1306,9 @@ void HttpApi::route_remove_member() {
         .methods("DELETE"_method)
     ([this](const crow::request& req, const std::string& chat_id,
             const std::string& target_uid) {
-        std::string uid = authenticate_request(req.get_header_value("Authorization"));
-        if (uid.empty()) return JSON_ERR(401, "Unauthorized");
+        int auth_status = 401;
+        std::string uid = authenticate_request(req.get_header_value("Authorization"), auth_status);
+        if (uid.empty()) return JSON_ERR(auth_status, auth_status == 503 ? "Service unavailable" : "Unauthorized");
 
         try {
             db_->exec(R"(
@@ -1303,8 +1329,9 @@ void HttpApi::route_remove_member() {
 void HttpApi::route_search_messages() {
     CROW_ROUTE((*app_), "/api/chats/<string>/search")
     ([this](const crow::request& req, const std::string& chat_id) {
-        std::string uid = authenticate_request(req.get_header_value("Authorization"));
-        if (uid.empty()) return JSON_ERR(401, "Unauthorized");
+        int auth_status = 401;
+        std::string uid = authenticate_request(req.get_header_value("Authorization"), auth_status);
+        if (uid.empty()) return JSON_ERR(auth_status, auth_status == 503 ? "Service unavailable" : "Unauthorized");
 
         std::string q = req.url_params.get("q") ? req.url_params.get("q") : "";
         if (q.empty()) return json_resp(200, json::array());
@@ -1335,8 +1362,9 @@ void HttpApi::route_pin_message() {
         .methods("POST"_method)
     ([this](const crow::request& req, const std::string& /*chat_id*/,
             const std::string& msg_id) {
-        std::string uid = authenticate_request(req.get_header_value("Authorization"));
-        if (uid.empty()) return JSON_ERR(401, "Unauthorized");
+        int auth_status = 401;
+        std::string uid = authenticate_request(req.get_header_value("Authorization"), auth_status);
+        if (uid.empty()) return JSON_ERR(auth_status, auth_status == 503 ? "Service unavailable" : "Unauthorized");
         try {
             db_->exec("UPDATE messages SET is_pinned = NOT is_pinned WHERE id = $1",
                       {msg_id});
@@ -1355,8 +1383,9 @@ void HttpApi::route_react_message() {
         .methods("POST"_method)
     ([this](const crow::request& req, const std::string& /*chat_id*/,
             const std::string& msg_id) {
-        std::string uid = authenticate_request(req.get_header_value("Authorization"));
-        if (uid.empty()) return JSON_ERR(401, "Unauthorized");
+        int auth_status = 401;
+        std::string uid = authenticate_request(req.get_header_value("Authorization"), auth_status);
+        if (uid.empty()) return JSON_ERR(auth_status, auth_status == 503 ? "Service unavailable" : "Unauthorized");
 
         json body;
         try { body = json::parse(req.body); }
@@ -1382,8 +1411,9 @@ void HttpApi::route_react_message() {
 void HttpApi::route_mute_chat() {
     CROW_ROUTE((*app_), "/api/chats/<string>/mute").methods("POST"_method)
     ([this](const crow::request& req, const std::string& chat_id) {
-        std::string uid = authenticate_request(req.get_header_value("Authorization"));
-        if (uid.empty()) return JSON_ERR(401, "Unauthorized");
+        int auth_status = 401;
+        std::string uid = authenticate_request(req.get_header_value("Authorization"), auth_status);
+        if (uid.empty()) return JSON_ERR(auth_status, auth_status == 503 ? "Service unavailable" : "Unauthorized");
         try {
             db_->exec(R"(
                 UPDATE chat_members
@@ -1406,8 +1436,9 @@ void HttpApi::route_mute_chat() {
 void HttpApi::route_chat_search_users() {
     CROW_ROUTE((*app_), "/api/chats/users/search")
     ([this](const crow::request& req) {
-        std::string uid = authenticate_request(req.get_header_value("Authorization"));
-        if (uid.empty()) return JSON_ERR(401, "Unauthorized");
+        int auth_status = 401;
+        std::string uid = authenticate_request(req.get_header_value("Authorization"), auth_status);
+        if (uid.empty()) return JSON_ERR(auth_status, auth_status == 503 ? "Service unavailable" : "Unauthorized");
 
         std::string q = req.url_params.get("q") ? req.url_params.get("q") : "";
         std::string like = "%" + q + "%";
@@ -1437,8 +1468,9 @@ void HttpApi::route_chat_search_users() {
 void HttpApi::route_get_contacts() {
     CROW_ROUTE((*app_), "/api/contacts")
     ([this](const crow::request& req) {
-        std::string uid = authenticate_request(req.get_header_value("Authorization"));
-        if (uid.empty()) return JSON_ERR(401, "Unauthorized");
+        int auth_status = 401;
+        std::string uid = authenticate_request(req.get_header_value("Authorization"), auth_status);
+        if (uid.empty()) return JSON_ERR(auth_status, auth_status == 503 ? "Service unavailable" : "Unauthorized");
         try {
             auto rows = db_->query(R"(
                 SELECT u.id, u.username, u.display_name, u.avatar_url, u.status,
@@ -1467,8 +1499,9 @@ void HttpApi::route_get_contacts() {
 void HttpApi::route_add_contact() {
     CROW_ROUTE((*app_), "/api/contacts").methods("POST"_method)
     ([this](const crow::request& req) {
-        std::string uid = authenticate_request(req.get_header_value("Authorization"));
-        if (uid.empty()) return JSON_ERR(401, "Unauthorized");
+        int auth_status = 401;
+        std::string uid = authenticate_request(req.get_header_value("Authorization"), auth_status);
+        if (uid.empty()) return JSON_ERR(auth_status, auth_status == 503 ? "Service unavailable" : "Unauthorized");
 
         json body;
         try { body = json::parse(req.body); }
@@ -1493,8 +1526,9 @@ void HttpApi::route_add_contact() {
 void HttpApi::route_remove_contact() {
     CROW_ROUTE((*app_), "/api/contacts/<string>").methods("DELETE"_method)
     ([this](const crow::request& req, const std::string& contact_id) {
-        std::string uid = authenticate_request(req.get_header_value("Authorization"));
-        if (uid.empty()) return JSON_ERR(401, "Unauthorized");
+        int auth_status = 401;
+        std::string uid = authenticate_request(req.get_header_value("Authorization"), auth_status);
+        if (uid.empty()) return JSON_ERR(auth_status, auth_status == 503 ? "Service unavailable" : "Unauthorized");
         try {
             db_->exec("DELETE FROM contacts WHERE user_id=$1 AND contact_id=$2",
                       {uid, contact_id});
@@ -1506,8 +1540,9 @@ void HttpApi::route_remove_contact() {
 void HttpApi::route_check_contact() {
     CROW_ROUTE((*app_), "/api/contacts/check/<string>")
     ([this](const crow::request& req, const std::string& contact_id) {
-        std::string uid = authenticate_request(req.get_header_value("Authorization"));
-        if (uid.empty()) return JSON_ERR(401, "Unauthorized");
+        int auth_status = 401;
+        std::string uid = authenticate_request(req.get_header_value("Authorization"), auth_status);
+        if (uid.empty()) return JSON_ERR(auth_status, auth_status == 503 ? "Service unavailable" : "Unauthorized");
         try {
             auto rows = db_->query(
                 "SELECT 1 FROM contacts WHERE user_id=$1 AND contact_id=$2",
@@ -1520,8 +1555,9 @@ void HttpApi::route_check_contact() {
 void HttpApi::route_find_by_phone() {
     CROW_ROUTE((*app_), "/api/contacts/find-by-phone")
     ([this](const crow::request& req) {
-        std::string uid = authenticate_request(req.get_header_value("Authorization"));
-        if (uid.empty()) return JSON_ERR(401, "Unauthorized");
+        int auth_status = 401;
+        std::string uid = authenticate_request(req.get_header_value("Authorization"), auth_status);
+        if (uid.empty()) return JSON_ERR(auth_status, auth_status == 503 ? "Service unavailable" : "Unauthorized");
 
         std::string phone = req.url_params.get("phone")
                             ? req.url_params.get("phone") : "";
@@ -1551,8 +1587,9 @@ void HttpApi::route_find_by_phone() {
 void HttpApi::route_explore_channels() {
     CROW_ROUTE((*app_), "/api/channels/explore")
     ([this](const crow::request& req) {
-        std::string uid = authenticate_request(req.get_header_value("Authorization"));
-        if (uid.empty()) return JSON_ERR(401, "Unauthorized");
+        int auth_status = 401;
+        std::string uid = authenticate_request(req.get_header_value("Authorization"), auth_status);
+        if (uid.empty()) return JSON_ERR(auth_status, auth_status == 503 ? "Service unavailable" : "Unauthorized");
 
         std::string q = req.url_params.get("q") ? req.url_params.get("q") : "";
         std::string like = "%" + q + "%";
@@ -1576,8 +1613,9 @@ void HttpApi::route_explore_channels() {
 void HttpApi::route_my_channels() {
     CROW_ROUTE((*app_), "/api/channels/my")
     ([this](const crow::request& req) {
-        std::string uid = authenticate_request(req.get_header_value("Authorization"));
-        if (uid.empty()) return JSON_ERR(401, "Unauthorized");
+        int auth_status = 401;
+        std::string uid = authenticate_request(req.get_header_value("Authorization"), auth_status);
+        if (uid.empty()) return JSON_ERR(auth_status, auth_status == 503 ? "Service unavailable" : "Unauthorized");
         try {
             auto rows = db_->query(R"(
                 SELECT c.id, c.username, c.name, c.avatar_url, cs.role
@@ -1596,8 +1634,9 @@ void HttpApi::route_my_channels() {
 void HttpApi::route_create_channel() {
     CROW_ROUTE((*app_), "/api/channels").methods("POST"_method)
     ([this](const crow::request& req) {
-        std::string uid = authenticate_request(req.get_header_value("Authorization"));
-        if (uid.empty()) return JSON_ERR(401, "Unauthorized");
+        int auth_status = 401;
+        std::string uid = authenticate_request(req.get_header_value("Authorization"), auth_status);
+        if (uid.empty()) return JSON_ERR(auth_status, auth_status == 503 ? "Service unavailable" : "Unauthorized");
 
         json body;
         try { body = json::parse(req.body); }
@@ -1636,8 +1675,9 @@ void HttpApi::route_create_channel() {
 void HttpApi::route_get_channel() {
     CROW_ROUTE((*app_), "/api/channels/<string>")
     ([this](const crow::request& req, const std::string& username) {
-        std::string uid = authenticate_request(req.get_header_value("Authorization"));
-        if (uid.empty()) return JSON_ERR(401, "Unauthorized");
+        int auth_status = 401;
+        std::string uid = authenticate_request(req.get_header_value("Authorization"), auth_status);
+        if (uid.empty()) return JSON_ERR(auth_status, auth_status == 503 ? "Service unavailable" : "Unauthorized");
         try {
             auto rows = db_->query(R"(
                 SELECT id, username, name, description, avatar_url,
@@ -1653,8 +1693,9 @@ void HttpApi::route_get_channel() {
 void HttpApi::route_subscribe_channel() {
     CROW_ROUTE((*app_), "/api/channels/<string>/subscribe").methods("POST"_method)
     ([this](const crow::request& req, const std::string& channel_id) {
-        std::string uid = authenticate_request(req.get_header_value("Authorization"));
-        if (uid.empty()) return JSON_ERR(401, "Unauthorized");
+        int auth_status = 401;
+        std::string uid = authenticate_request(req.get_header_value("Authorization"), auth_status);
+        if (uid.empty()) return JSON_ERR(auth_status, auth_status == 503 ? "Service unavailable" : "Unauthorized");
         try {
             db_->exec(R"(
                 INSERT INTO channel_subscribers (channel_id, user_id, role)
@@ -1673,8 +1714,9 @@ void HttpApi::route_subscribe_channel() {
 void HttpApi::route_get_channel_posts() {
     CROW_ROUTE((*app_), "/api/channels/<string>/posts")
     ([this](const crow::request& req, const std::string& channel_id) {
-        std::string uid = authenticate_request(req.get_header_value("Authorization"));
-        if (uid.empty()) return JSON_ERR(401, "Unauthorized");
+        int auth_status = 401;
+        std::string uid = authenticate_request(req.get_header_value("Authorization"), auth_status);
+        if (uid.empty()) return JSON_ERR(auth_status, auth_status == 503 ? "Service unavailable" : "Unauthorized");
 
         std::string before = req.url_params.get("before")
                              ? req.url_params.get("before") : "";
@@ -1704,8 +1746,9 @@ void HttpApi::route_get_channel_posts() {
 void HttpApi::route_create_post() {
     CROW_ROUTE((*app_), "/api/channels/<string>/posts").methods("POST"_method)
     ([this](const crow::request& req, const std::string& channel_id) {
-        std::string uid = authenticate_request(req.get_header_value("Authorization"));
-        if (uid.empty()) return JSON_ERR(401, "Unauthorized");
+        int auth_status = 401;
+        std::string uid = authenticate_request(req.get_header_value("Authorization"), auth_status);
+        if (uid.empty()) return JSON_ERR(auth_status, auth_status == 503 ? "Service unavailable" : "Unauthorized");
 
         json body;
         try { body = json::parse(req.body); }
@@ -1739,8 +1782,9 @@ void HttpApi::route_delete_post() {
         .methods("DELETE"_method)
     ([this](const crow::request& req, const std::string& channel_id,
             const std::string& post_id) {
-        std::string uid = authenticate_request(req.get_header_value("Authorization"));
-        if (uid.empty()) return JSON_ERR(401, "Unauthorized");
+        int auth_status = 401;
+        std::string uid = authenticate_request(req.get_header_value("Authorization"), auth_status);
+        if (uid.empty()) return JSON_ERR(auth_status, auth_status == 503 ? "Service unavailable" : "Unauthorized");
         try {
             db_->exec(
                 "DELETE FROM channel_posts WHERE id=$1 AND channel_id=$2",

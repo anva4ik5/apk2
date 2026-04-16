@@ -27,35 +27,52 @@ bool RedisClient::connect() {
         return true;
     }
 
-    for (auto& connection : pool_) {
-        connection->context = redisConnect(config_.host.c_str(), config_.port);
-        
-        if (connection->context == nullptr || connection->context->err) {
-            last_error_ = "Failed to connect to Redis";
+    int attempt = 0;
+    while (attempt < config_.max_retries) {
+        ++attempt;
+        bool ok = true;
+
+        for (auto& connection : pool_) {
             if (connection->context) {
                 redisFree(connection->context);
                 connection->context = nullptr;
             }
-            if (error_callback_) error_callback_(last_error_);
-            disconnect();
-            return false;
+
+            connection->context = redisConnect(config_.host.c_str(), config_.port);
+            if (connection->context == nullptr || connection->context->err) {
+                ok = false;
+                if (connection->context) {
+                    redisFree(connection->context);
+                    connection->context = nullptr;
+                }
+                break;
+            }
+
+            redisReply* reply = (redisReply*)redisCommand(connection->context, "PING");
+            if (reply == nullptr || reply->type != REDIS_REPLY_STATUS || strcmp(reply->str, "PONG") != 0) {
+                ok = false;
+                if (reply) freeReplyObject(reply);
+                break;
+            }
+            freeReplyObject(reply);
         }
 
-        redisReply* reply = (redisReply*)redisCommand(connection->context, "PING");
-        if (reply == nullptr || reply->type != REDIS_REPLY_STATUS || strcmp(reply->str, "PONG") != 0) {
-            last_error_ = "Redis PING failed";
-            if (reply) freeReplyObject(reply);
-            disconnect();
-            return false;
+        if (ok) {
+            running_ = true;
+            subscriber_thread_ = std::thread(&RedisClient::subscriber_loop, this);
+            std::cout << "Connected to Redis" << std::endl;
+            return true;
         }
-        freeReplyObject(reply);
+
+        disconnect();
+        last_error_ = "Failed to connect to Redis (attempt " + std::to_string(attempt) + ")";
+        if (error_callback_) error_callback_(last_error_);
+        std::this_thread::sleep_for(std::chrono::milliseconds(500 * attempt));
     }
 
-    running_ = true;
-    subscriber_thread_ = std::thread(&RedisClient::subscriber_loop, this);
-    
-    std::cout << "Connected to Redis" << std::endl;
-    return true;
+    last_error_ = "Failed to connect to Redis after " + std::to_string(config_.max_retries) + " attempts";
+    if (error_callback_) error_callback_(last_error_);
+    return false;
 }
 
 void RedisClient::disconnect() {
@@ -98,6 +115,13 @@ std::shared_ptr<RedisClient::Connection> RedisClient::acquire_connection() {
 
 std::string RedisClient::send_command(Connection& conn, const std::string& cmd) {
     redisReply* reply = (redisReply*)redisCommand(conn.context, cmd.c_str());
+    if (reply == nullptr && conn.context && conn.context->err) {
+        last_error_ = "Redis command failed, trying reconnect";
+        if (error_callback_) error_callback_(last_error_);
+        if (reconnect()) {
+            reply = (redisReply*)redisCommand(conn.context, cmd.c_str());
+        }
+    }
     if (reply == nullptr) {
         return "";
     }
@@ -187,6 +211,14 @@ std::vector<std::string> RedisClient::lrange(const std::string& key, int start, 
     if (!conn) return {};
     
     redisReply* reply = (redisReply*)redisCommand(conn->context, "LRANGE %s %d %d", key.c_str(), start, stop);
+    if (reply == nullptr && conn->context && conn->context->err) {
+        last_error_ = "Redis LRANGE failed, trying reconnect";
+        if (error_callback_) error_callback_(last_error_);
+        if (reconnect()) {
+            reply = (redisReply*)redisCommand(conn->context, "LRANGE %s %d %d", key.c_str(), start, stop);
+        }
+    }
+
     std::vector<std::string> result;
     
     if (reply && reply->type == REDIS_REPLY_ARRAY) {
@@ -197,7 +229,7 @@ std::vector<std::string> RedisClient::lrange(const std::string& key, int start, 
         }
     }
     
-    freeReplyObject(reply);
+    if (reply) freeReplyObject(reply);
     return result;
 }
 
@@ -227,6 +259,14 @@ std::vector<std::string> RedisClient::smembers(const std::string& key) {
     if (!conn) return {};
     
     redisReply* reply = (redisReply*)redisCommand(conn->context, "SMEMBERS %s", key.c_str());
+    if (reply == nullptr && conn->context && conn->context->err) {
+        last_error_ = "Redis SMEMBERS failed, trying reconnect";
+        if (error_callback_) error_callback_(last_error_);
+        if (reconnect()) {
+            reply = (redisReply*)redisCommand(conn->context, "SMEMBERS %s", key.c_str());
+        }
+    }
+
     std::vector<std::string> result;
     
     if (reply && reply->type == REDIS_REPLY_ARRAY) {
@@ -237,7 +277,7 @@ std::vector<std::string> RedisClient::smembers(const std::string& key) {
         }
     }
     
-    freeReplyObject(reply);
+    if (reply) freeReplyObject(reply);
     return result;
 }
 
@@ -285,6 +325,14 @@ std::vector<std::pair<std::string, std::string>> RedisClient::hgetall(const std:
     if (!conn) return {};
     
     redisReply* reply = (redisReply*)redisCommand(conn->context, "HGETALL %s", key.c_str());
+    if (reply == nullptr && conn->context && conn->context->err) {
+        last_error_ = "Redis HGETALL failed, trying reconnect";
+        if (error_callback_) error_callback_(last_error_);
+        if (reconnect()) {
+            reply = (redisReply*)redisCommand(conn->context, "HGETALL %s", key.c_str());
+        }
+    }
+
     std::vector<std::pair<std::string, std::string>> result;
     
     if (reply && reply->type == REDIS_REPLY_ARRAY) {
@@ -295,7 +343,7 @@ std::vector<std::pair<std::string, std::string>> RedisClient::hgetall(const std:
         }
     }
     
-    freeReplyObject(reply);
+    if (reply) freeReplyObject(reply);
     return result;
 }
 
