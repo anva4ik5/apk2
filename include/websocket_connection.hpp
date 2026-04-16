@@ -87,6 +87,7 @@ public:
     bool remove_connection(int connection_id);
     std::shared_ptr<WebSocketConnection> get_connection(int connection_id);
     std::shared_ptr<WebSocketConnection> find_by_user(const std::string& user_id);
+    void register_user(const std::string& user_id, int connection_id);
     
     // Broadcast operations
     void broadcast_to_user(const std::string& user_id, const WebSocketConnection::Message& msg);

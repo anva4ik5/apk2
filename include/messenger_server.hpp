@@ -69,6 +69,9 @@ public:
     json get_server_stats() const;
     json get_user_status(const std::string& user_id) const;
 
+    // Pool accessor for WebSocket flush
+    ConnectionPool* get_connection_pool() { return connection_pool_.get(); }
+
 private:
     struct PendingMessage {
         std::string sender_id;
