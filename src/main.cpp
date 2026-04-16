@@ -115,11 +115,15 @@ int main(int argc, char* argv[]) {
     g_http_api = &http_api;
 
     std::thread http_thread([&http_api]() {
-        try { http_api.run(); }
+        try { 
+            std::cout << "[HTTP] Thread started, initializing..." << std::endl;
+            http_api.run(); 
+        }
         catch (const std::exception& e) {
-            std::cerr << "[HTTP] Error: " << e.what() << std::endl;
+            std::cerr << "[HTTP] Fatal error: " << e.what() << std::endl;
         }
     });
+    http_thread.detach();  // Run HTTP server independently
 
     // --- WebSocket Server (main thread) ---
     MessengerServer::Config ws_cfg;
@@ -159,6 +163,6 @@ int main(int argc, char* argv[]) {
     }
 
     http_api.stop();
-    http_thread.join();
+    // http_thread is detached, no join needed
     return 0;
 }

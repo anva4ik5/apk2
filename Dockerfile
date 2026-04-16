@@ -21,6 +21,9 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /build
 COPY . .
 
+# Clean any existing build directory from host to avoid CMake cache conflicts
+RUN rm -rf build
+
 # Собираем проект
 RUN mkdir -p build && cd build && \
     cmake .. -DCMAKE_BUILD_TYPE=Release && \

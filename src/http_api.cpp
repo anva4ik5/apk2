@@ -422,13 +422,25 @@ HttpApi::HttpApi(const Config& cfg) : cfg_(cfg) {
     } catch (const std::exception& e) {
         std::cerr << "[DB] Migration warning: " << e.what() << std::endl;
     }
+    std::cout << "[HTTP] Constructor complete, ready to run" << std::endl;
 }
 
 HttpApi::~HttpApi() = default;
 
 void HttpApi::run() {
+    std::cout << "[HTTP] Registering routes..." << std::endl;
+    std::cout.flush();
+    
+    auto start_time = std::chrono::high_resolution_clock::now();
     register_routes();
+    auto register_duration = std::chrono::high_resolution_clock::now() - start_time;
+    
+    std::cout << "[HTTP] Routes registered in " 
+              << std::chrono::duration_cast<std::chrono::milliseconds>(register_duration).count() 
+              << "ms" << std::endl;
     std::cout << "[HTTP] Starting REST API on port " << cfg_.port << std::endl;
+    std::cout.flush();
+    
     app_->port(cfg_.port).multithreaded().run();
 }
 
