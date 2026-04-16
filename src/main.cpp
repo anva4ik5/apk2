@@ -148,7 +148,7 @@ int main(int argc, char* argv[]) {
         std::cerr << "[WS] Failed to start after retries, continuing with HTTP server only" << std::endl;
     }
 
-    std::cout << "[ok] HTTP server running on port " << http_port 
+    std::cout << "[ok] HTTP v2 server running on port " << http_port 
               << ". WS server status: " << (ws_server.is_running() ? "running" : "degraded") 
               << ". Ctrl+C to stop." << std::endl;
 
