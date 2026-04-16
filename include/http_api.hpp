@@ -11,6 +11,8 @@ struct pg_conn; typedef pg_conn PGconn;
 
 using json = nlohmann::json;
 
+class RedisClient;
+
 // ============================================================
 // Thin DB wrapper (libpq)
 // ============================================================
@@ -80,6 +82,7 @@ private:
     Config cfg_;
     std::unique_ptr<PgDb> db_;
     std::unique_ptr<crow::SimpleApp> app_;
+    std::unique_ptr<RedisClient> redis_;
 
     // ---- route handlers ----
     void register_routes();
@@ -132,6 +135,8 @@ private:
     // ---- helpers ----
     std::string extract_token(const std::string& auth_header) const;
     std::string authenticate_request(const std::string& auth_header) const;
+    bool redis_available() const;
+    void store_redis_session(const std::string& session_token, const std::string& user_id);
     bool send_otp_email(const std::string& email, const std::string& code);
     std::string hash_password(const std::string& password);
     bool verify_password(const std::string& password, const std::string& hash);

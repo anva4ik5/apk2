@@ -80,11 +80,9 @@ int main(int argc, char* argv[]) {
     MessengerServer ws_server(ws_cfg);
     g_ws_server = &ws_server;
 
-    if (!ws_server.start()) {
-        std::cerr << "[WS] Failed to start" << std::endl;
-        http_api.stop();
-        http_thread.join();
-        return 1;
+    while (!ws_server.start()) {
+        std::cerr << "[WS] Failed to start, retrying in 5 seconds..." << std::endl;
+        std::this_thread::sleep_for(std::chrono::seconds(5));
     }
 
     std::cout << "[ok] Both servers running. Ctrl+C to stop." << std::endl;

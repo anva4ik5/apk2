@@ -35,16 +35,18 @@ bool MessengerServer::start() {
         return true;
     }
     
-    // Connect to Redis
-    if (!redis_->connect()) {
-        log("error", "Failed to connect to Redis");
-        return false;
-    }
-    
-    // Set up error callback
+    // Set up error callback before attempting connection
     redis_->set_error_callback([this](const std::string& error) {
         log("error", "Redis error: " + error);
+        on_redis_disconnected();
     });
+
+    while (!redis_->connect()) {
+        log("error", "Failed to connect to Redis, retrying in 5 seconds...");
+        std::this_thread::sleep_for(std::chrono::seconds(5));
+    }
+
+    on_redis_connected();
     
     running_ = true;
     

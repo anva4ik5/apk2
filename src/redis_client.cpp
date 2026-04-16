@@ -32,14 +32,20 @@ bool RedisClient::connect() {
         
         if (connection->context == nullptr || connection->context->err) {
             last_error_ = "Failed to connect to Redis";
+            if (connection->context) {
+                redisFree(connection->context);
+                connection->context = nullptr;
+            }
             if (error_callback_) error_callback_(last_error_);
+            disconnect();
             return false;
         }
 
         redisReply* reply = (redisReply*)redisCommand(connection->context, "PING");
         if (reply == nullptr || reply->type != REDIS_REPLY_STATUS || strcmp(reply->str, "PONG") != 0) {
             last_error_ = "Redis PING failed";
-            freeReplyObject(reply);
+            if (reply) freeReplyObject(reply);
+            disconnect();
             return false;
         }
         freeReplyObject(reply);

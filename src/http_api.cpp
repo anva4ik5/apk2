@@ -58,6 +58,7 @@
 #include <algorithm>
 
 #include "http_api.hpp"
+#include "redis_client.hpp"
 
 using json = nlohmann::json;
 
@@ -319,6 +320,18 @@ HttpApi::HttpApi(const Config& cfg) : cfg_(cfg) {
     db_ = std::make_unique<PgDb>(cfg_.db_url);
     app_ = std::make_unique<crow::SimpleApp>();
 
+    RedisClient::Config redis_cfg;
+    redis_cfg.host = cfg_.redis_host;
+    redis_cfg.port = cfg_.redis_port;
+    redis_cfg.pool_size = 4;
+    redis_ = std::make_unique<RedisClient>(redis_cfg);
+    redis_->set_error_callback([this](const std::string& error) {
+        std::cerr << "[HTTP] Redis error: " << error << std::endl;
+    });
+    if (!redis_->connect()) {
+        std::cerr << "[HTTP] Redis unavailable at " << cfg_.redis_host << ":" << cfg_.redis_port << std::endl;
+    }
+
     // Auto-migrate: create tables if they don't exist
     try {
         // Extensions
@@ -423,6 +436,15 @@ void HttpApi::stop() {
     app_->stop();
 }
 
+bool HttpApi::redis_available() const {
+    return redis_ && redis_->is_connected();
+}
+
+void HttpApi::store_redis_session(const std::string& session_token, const std::string& user_id) {
+    if (!redis_available()) return;
+    redis_->set("session:" + session_token, user_id, 86400);
+}
+
 // ============================================================
 // Helpers
 // ============================================================
@@ -436,7 +458,25 @@ std::string HttpApi::extract_token(const std::string& auth_header) const {
 std::string HttpApi::authenticate_request(const std::string& auth_header) const {
     auto token = extract_token(auth_header);
     if (token.empty()) return "";
-    return JwtHelper::verify(token, cfg_.jwt_secret);
+
+    if (!redis_ || !redis_->is_connected()) {
+        if (redis_ && !redis_->connect()) {
+            std::cerr << "[HTTP] Redis unavailable for auth validation" << std::endl;
+            return "";
+        }
+    }
+
+    auto user_id = JwtHelper::verify(token, cfg_.jwt_secret);
+    if (user_id.empty()) return "";
+
+    if (redis_available()) {
+        auto stored_user = redis_->get("session:" + token);
+        if (stored_user.empty() || stored_user != user_id) {
+            return "";
+        }
+    }
+
+    return user_id;
 }
 
 std::string HttpApi::hash_password(const std::string& password) {
@@ -653,6 +693,7 @@ void HttpApi::route_verify_otp() {
         // Existing user — issue JWT
         std::string user_id = user_rows[0]["id"].get<std::string>();
         std::string token = JwtHelper::create(user_id, cfg_.jwt_secret);
+        store_redis_session(token, user_id);
         return json_resp(200, {
             {"token", token},
             {"needsRegistration", false},
@@ -745,6 +786,7 @@ void HttpApi::route_register() {
         }
 
         std::string token = JwtHelper::create(user_id, cfg_.jwt_secret);
+        store_redis_session(token, user_id);
         return json_resp(201, {{"token", token}, {"userId", user_id}});
     });
 }
