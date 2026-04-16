@@ -30,33 +30,50 @@ int main(int argc, char* argv[]) {
 
     std::string redis_host;
     int         redis_port = 6379;
+    std::string redis_password;
 
     std::string redishost_env = env("REDISHOST", "");
     std::string redisport_env = env("REDISPORT", "");
+    std::string redispass_env = env("REDISPASSWORD", "");
 
+    // Parse REDIS_URL to extract password, host, port
+    {
+        std::string redis_url = env("REDIS_URL", "");
+        if (!redis_url.empty()) {
+            // Format: redis://default:PASSWORD@host:port
+            auto scheme_pos = redis_url.find("://");
+            std::string after = (scheme_pos != std::string::npos)
+                ? redis_url.substr(scheme_pos + 3) : redis_url;
+            auto at_pos = after.rfind('@');
+            std::string hostpart = after;
+            if (at_pos != std::string::npos) {
+                std::string userinfo = after.substr(0, at_pos);
+                hostpart = after.substr(at_pos + 1);
+                auto colon2 = userinfo.find(':');
+                redis_password = (colon2 != std::string::npos)
+                    ? userinfo.substr(colon2 + 1) : userinfo;
+            }
+            auto slash = hostpart.find('/');
+            if (slash != std::string::npos) hostpart = hostpart.substr(0, slash);
+            auto colon = hostpart.rfind(':');
+            if (colon != std::string::npos) {
+                redis_host = hostpart.substr(0, colon);
+                try { redis_port = std::stoi(hostpart.substr(colon + 1)); } catch (...) {}
+            } else {
+                redis_host = hostpart;
+            }
+        }
+    }
+
+    // REDISHOST/REDISPORT override URL-parsed values
     if (!redishost_env.empty()) {
         redis_host = redishost_env;
         if (!redisport_env.empty()) {
             try { redis_port = std::stoi(redisport_env); } catch (...) { redis_port = 6379; }
         }
-    } else {
-        std::string redis_url = env("REDIS_URL", "");
-        if (redis_url.empty()) redis_url = "redis://redis:6379";
-
-        std::string url = redis_url;
-        auto scheme_pos = url.find("://");
-        if (scheme_pos != std::string::npos) url = url.substr(scheme_pos + 3);
-        auto slash_pos = url.find('/');
-        if (slash_pos != std::string::npos) url = url.substr(0, slash_pos);
-        auto colon_pos = url.rfind(':');
-        if (colon_pos != std::string::npos && colon_pos + 1 < url.size()) {
-            redis_host = url.substr(0, colon_pos);
-            try { redis_port = std::stoi(url.substr(colon_pos + 1)); } catch (...) { redis_port = 6379; }
-        } else {
-            redis_host = url.empty() ? "redis" : url;
-            redis_port = 6379;
-        }
     }
+    if (!redispass_env.empty()) redis_password = redispass_env;
+    if (redis_host.empty()) redis_host = "redis";
 
     uint16_t http_port = 8080;
     try { http_port = (uint16_t)std::stoi(env("PORT", "8080")); } catch (...) { http_port = 8080; }
@@ -117,8 +134,9 @@ int main(int argc, char* argv[]) {
     HttpApi::Config http_cfg;
     http_cfg.port       = http_port;
     http_cfg.db_url     = db_url;
-    http_cfg.redis_host = redis_host;
-    http_cfg.redis_port = redis_port;
+    http_cfg.redis_host     = redis_host;
+    http_cfg.redis_port     = redis_port;
+    http_cfg.redis_password = redis_password;
     http_cfg.jwt_secret = jwt_secret;
 
     HttpApi http_api(http_cfg);

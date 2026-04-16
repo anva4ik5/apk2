@@ -232,6 +232,7 @@ HttpApi::HttpApi(const Config& cfg) : cfg_(cfg) {
     RedisClient::Config redis_cfg;
     redis_cfg.host = cfg_.redis_host;
     redis_cfg.port = cfg_.redis_port;
+    redis_cfg.password = cfg_.redis_password;
     redis_cfg.pool_size = 4;
     redis_ = std::make_unique<RedisClient>(redis_cfg);
     redis_->set_error_callback([this](const std::string& error) {
