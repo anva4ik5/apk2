@@ -4,12 +4,13 @@ dockerfilePath = "Dockerfile"
 buildContext = "."
 
 [deploy]
-startCommand = "/app/server"
+startCommand = "/app/entrypoint.sh"
 restartPolicyType = "on_failure"
+healthcheckPath = "/health"
+healthcheckTimeout = 30
 
 [env]
-HOST = "0.0.0.0"  #PORT = "8080"
+HOST = "0.0.0.0"
+PORT = "8080"
 WS_PORT = "8000"
 LOG_LEVEL = "info"
-WORKERS = "8"
-MAX_CONNECTIONS = "50000"
