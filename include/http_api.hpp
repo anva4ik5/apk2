@@ -151,8 +151,9 @@ public:
     struct Config {
         uint16_t    port        = 8080;
         std::string db_url;
-        std::string redis_host  = "localhost";
-        int         redis_port  = 6379;
+        std::string redis_host     = "localhost";
+        int         redis_port     = 6379;
+        std::string redis_password;   // AUTH password for Railway Redis
         std::string jwt_secret  = "change_me_in_prod";
         std::string smtp_host;       // for e-mail OTP (optional)
         int         smtp_port   = 587;
