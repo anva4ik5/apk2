@@ -12,6 +12,7 @@
 #include <libpq-fe.h>
 
 #include <crow.h>
+#include "messenger_server.hpp"
 
 using json = nlohmann::json;
 
@@ -167,6 +168,9 @@ public:
     void run();
     void stop();
 
+    // Attach the MessengerServer so /ws can delegate to it
+    void set_messenger(MessengerServer* ms) { messenger_ = ms; }
+
     std::string authenticate_request(const std::string& auth_header, int& status_code) const;
 
 private:
@@ -175,9 +179,13 @@ private:
     std::unique_ptr<PgDb> db_;
     std::unique_ptr<crow::SimpleApp> app_;
     std::unique_ptr<RedisClient> redis_;
+    MessengerServer* messenger_ = nullptr;  // not owned
 
     // ---- route handlers ----
     void register_routes();
+
+    // WebSocket
+    void route_websocket();          // GET /ws (upgrade)
 
     // Auth
     void route_send_otp();       // POST /api/auth/send-otp
