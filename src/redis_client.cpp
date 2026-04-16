@@ -51,6 +51,22 @@ bool RedisClient::connect() {
                 break;
             }
 
+            // AUTH if password is set (required for Railway Redis)
+            if (!config_.password.empty()) {
+                redisReply* auth_reply = (redisReply*)redisCommand(
+                    connection->context, "AUTH %s", config_.password.c_str());
+                bool auth_ok = auth_reply && auth_reply->type == REDIS_REPLY_STATUS
+                               && strcmp(auth_reply->str, "OK") == 0;
+                if (auth_reply) freeReplyObject(auth_reply);
+                if (!auth_ok) {
+                    std::cerr << "[Redis] AUTH failed" << std::endl;
+                    ok = false;
+                    redisFree(connection->context);
+                    connection->context = nullptr;
+                    break;
+                }
+            }
+
             redisReply* reply = (redisReply*)redisCommand(connection->context, "PING");
             if (reply == nullptr || reply->type != REDIS_REPLY_STATUS || strcmp(reply->str, "PONG") != 0) {
                 ok = false;
