@@ -33,6 +33,7 @@ public:
     struct Config {
         std::string host = "localhost";
         int port = 6379;
+        std::string password;   // Redis AUTH password (required for Railway)
         int pool_size = 32;
         int timeout_ms = 5000;
         int max_retries = 3;
