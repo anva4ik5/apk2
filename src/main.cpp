@@ -153,16 +153,18 @@ int main(int argc, char* argv[]) {
               << ". Ctrl+C to stop." << std::endl;
 
     int tick = 0;
-    while (ws_server.is_running()) {
+    while (true) {
         std::this_thread::sleep_for(std::chrono::seconds(1));
         if (++tick % 60 == 0) {
-            auto s = ws_server.get_server_stats();
-            std::cout << "[stats] conn=" << s["total_connections"]
-                      << " online=" << s["online_users"] << std::endl;
+            if (ws_server.is_running()) {
+                auto s = ws_server.get_server_stats();
+                std::cout << "[stats] conn=" << s["total_connections"]
+                          << " online=" << s["online_users"] << std::endl;
+            } else {
+                std::cout << "[main] WS server down, HTTP still running" << std::endl;
+            }
         }
     }
 
-    http_api.stop();
-    // http_thread is detached, no join needed
     return 0;
 }
