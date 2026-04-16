@@ -227,6 +227,7 @@ void MessengerServer::handle_authentication(int connection_id, const json& auth_
         conn->set_session_id(session_token);
         conn->mark_authenticated();
         
+        connection_pool_->register_user(user_id, connection_id);
         mark_user_online(user_id);
         
         // Subscribe to this user's message channel

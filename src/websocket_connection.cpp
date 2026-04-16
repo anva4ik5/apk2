@@ -116,6 +116,11 @@ std::shared_ptr<WebSocketConnection> ConnectionPool::get_connection(int connecti
     return nullptr;
 }
 
+void ConnectionPool::register_user(const std::string& user_id, int connection_id) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    user_to_connection_[user_id] = connection_id;
+}
+
 std::shared_ptr<WebSocketConnection> ConnectionPool::find_by_user(const std::string& user_id) {
     std::lock_guard<std::mutex> lock(mutex_);
     

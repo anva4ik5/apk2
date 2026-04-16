@@ -124,6 +124,9 @@ int main(int argc, char* argv[]) {
     HttpApi http_api(http_cfg);
     g_http_api = &http_api;
 
+    // Wire WebSocket messenger into HTTP so /ws route works on the same port
+    http_api.set_messenger(ws_server);
+
     std::cout << "[ok] Starting HTTP on port " << http_port << std::endl;
 
     try {

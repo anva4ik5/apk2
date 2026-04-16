@@ -53,6 +53,7 @@
 
 #include "http_api.hpp"
 #include "redis_client.hpp"
+#include "websocket_connection.hpp"
 
 using json = nlohmann::json;
 
@@ -527,6 +528,7 @@ bool HttpApi::send_otp_email(const std::string& /*email*/,
 
 void HttpApi::register_routes() {
     route_health();
+    route_websocket();
     route_send_otp();
     route_verify_otp();
     route_register();
@@ -565,6 +567,40 @@ void HttpApi::register_routes() {
 // ============================================================
 // Health
 // ============================================================
+
+void HttpApi::route_websocket() {
+    CROW_WEBSOCKET_ROUTE((*app_), "/ws")
+    .onopen([this](crow::websocket::connection& conn) {
+        int id = static_cast<int>(reinterpret_cast<uintptr_t>(&conn) & 0x7FFFFFFF);
+        conn.userdata(reinterpret_cast<void*>(static_cast<uintptr_t>(id)));
+        if (messenger_) messenger_->on_client_connected(id);
+    })
+    .onmessage([this](crow::websocket::connection& conn,
+                      const std::string& data, bool /*is_binary*/) {
+        int id = static_cast<int>(reinterpret_cast<uintptr_t>(conn.userdata()));
+        if (messenger_) {
+            messenger_->on_client_message(id, data);
+            // Flush queued outgoing messages back to this connection
+            auto* pool = messenger_->get_connection_pool();
+            if (pool) {
+                auto ws_conn = pool->get_connection(id);
+                if (ws_conn) {
+                    WebSocketConnection::Message msg;
+                    while (ws_conn->dequeue_message(msg)) {
+                        json out;
+                        out["type"]    = msg.type;
+                        out["payload"] = msg.payload;
+                        conn.send_text(out.dump());
+                    }
+                }
+            }
+        }
+    })
+    .onclose([this](crow::websocket::connection& conn, const std::string& /*reason*/) {
+        int id = static_cast<int>(reinterpret_cast<uintptr_t>(conn.userdata()));
+        if (messenger_) messenger_->on_client_disconnected(id);
+    });
+}
 
 void HttpApi::route_health() {
     CROW_ROUTE((*app_), "/health")
